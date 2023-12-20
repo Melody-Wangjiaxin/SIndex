@@ -102,6 +102,8 @@ inline void model_prepare(const std::vector<double *> &model_key_ptrs,
     }
 
     lapack_int rank = 0;
+    
+    
     int fitting_res =
         LAPACKE_dgelss(LAPACK_ROW_MAJOR, m, n, 1 /* nrhs */, a.data(),
                        n /* lda */, b.data(), 1 /* ldb */, s.data(), -1, &rank);

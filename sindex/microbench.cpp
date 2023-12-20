@@ -96,7 +96,7 @@ class StrKey {
   }
 
   StrKey() { memset(&buf, 0, len); }
-  StrKey(uint64_t key) { 
+  StrKey(const uint64_t key) { 
     memset(&buf, 0, len);
     memcpy(&buf, &key, sizeof(key));
     // COUT_N_EXIT("str key no uint64"); 
@@ -214,15 +214,17 @@ void weblogs_data() {
   size_t num = table_size;
   exist_keys.reserve(num);
   for (size_t j = 0; j < num; ++j) {
-    index_key_t* k = new index_key_t(read_keys[j]);
-    exist_keys.push_back(*k);
+    // index_key_t* k = new index_key_t(read_keys[j]);
+    exist_keys.push_back(*reinterpret_cast<index_key_t*>(&read_keys[j]));
+    // delete k;
   }
 
   if (insert_ratio > 0) {
     non_exist_keys.reserve(num);
     for (size_t j = num; j < num * 2; ++j) {
-      index_key_t* k = new index_key_t(read_keys[j]);
-      non_exist_keys.push_back(*k);
+      // index_key_t* k = new index_key_t(read_keys[j]);
+      non_exist_keys.push_back(*reinterpret_cast<index_key_t*>(&read_keys[j]));
+      // delete k;
     }
   }
 }
@@ -263,14 +265,16 @@ void map_data() {
   size_t num = table_size;
   exist_keys.reserve(num);
   for (size_t j = 0; j < num; ++j) {
-    index_key_t* k = new index_key_t(read_keys[j]);
-    exist_keys.push_back(*k);
+    // index_key_t* k = new index_key_t(read_keys[j]);
+    exist_keys.push_back(*reinterpret_cast<index_key_t*>(&read_keys[j]));
+    // delete k;
   }
   if (insert_ratio > 0) {
     non_exist_keys.reserve(num);
     for (size_t j = num; j < num * 2; ++j) {
-      index_key_t* k = new index_key_t(read_keys[j]);
-      non_exist_keys.push_back(*k);
+      // index_key_t* k = new index_key_t(read_keys[j]);
+      non_exist_keys.push_back(*reinterpret_cast<index_key_t*>(&read_keys[j]));
+      // delete k;
     }
   }
 }
@@ -301,14 +305,16 @@ void longlat_data() {
   size_t num = table_size;
   exist_keys.reserve(num);
   for (size_t j = 0; j < num; ++j) {
-    index_key_t* k = new index_key_t(read_keys[j]);
-    exist_keys.push_back(*k);
+    // index_key_t* k = new index_key_t(read_keys[j]);
+    exist_keys.push_back(*reinterpret_cast<index_key_t*>(&read_keys[j]));
+    // delete k;
   }
   if (insert_ratio > 0) {
     non_exist_keys.reserve(num);
     for (size_t j = num; j < num * 2; ++j) {
-      index_key_t* k = new index_key_t(read_keys[j]);
-      non_exist_keys.push_back(*k);
+      // index_key_t* k = new index_key_t(read_keys[j]);
+      non_exist_keys.push_back(*reinterpret_cast<index_key_t*>(&read_keys[j]));
+      // delete k;
     }
   }
 }
@@ -324,7 +330,7 @@ std::vector<key_type> read_lognormal(const std::string& path)
   }
   while(is.read((char *)&tmp_i, sizeof(tmp_i)))
   {
-    vec.push_back(tmp_i);
+    vec.push_back(*reinterpret_cast<uint64_t*>(&tmp_i));
   }
   is.close();
   return vec;
@@ -337,14 +343,16 @@ void lognormal_data() {
   size_t num = table_size;
   exist_keys.reserve(num);
   for (size_t j = 0; j < num; ++j) {
-    index_key_t* k = new index_key_t(read_keys[j]);
-    exist_keys.push_back(*k);
+    // index_key_t* k = new index_key_t(read_keys[j]);
+    exist_keys.push_back(*reinterpret_cast<index_key_t*>(&read_keys[j]));
+    // delete k;
   }
   if (insert_ratio > 0) {
     non_exist_keys.reserve(num);
     for (size_t j = num; j < num * 2; ++j) {
-      index_key_t* k = new index_key_t(read_keys[j]);
-      non_exist_keys.push_back(*k);
+      // index_key_t* k = new index_key_t(read_keys[j]);
+      non_exist_keys.push_back(*reinterpret_cast<index_key_t*>(&read_keys[j]));
+      // delete k;
     }
   }
 }
@@ -358,11 +366,16 @@ std::vector<key_type> read_ycsb(const std::string& path)
   if (!is.is_open()) {
     return vec;
   }
-  while(is.read((char *)&tmp_i, sizeof(tmp_i)))
-  {
-    vec.push_back(tmp_i);
-    // COUT_THIS(tmp_i);
+  size_t num = table_size;
+  for(size_t i = 0; i < 2 * num; i++){
+    if(is.read((char *)&tmp_i, sizeof(tmp_i))) vec.push_back(tmp_i);
+    else break;
   }
+  // while(is.read((char *)&tmp_i, sizeof(tmp_i)))
+  // {
+  //   vec.push_back(tmp_i);
+  //   // COUT_THIS(tmp_i);
+  // }
   is.close();
   return vec;
 }
@@ -374,14 +387,16 @@ void ycsb_data() {
   size_t num = table_size;
   exist_keys.reserve(num);
   for (size_t j = 0; j < num; ++j) {
-    index_key_t* k = new index_key_t(read_keys[j]);
-    exist_keys.push_back(*k);
+    // index_key_t* k = new index_key_t(read_keys[j]);
+    exist_keys.emplace_back(*reinterpret_cast<index_key_t*>(&read_keys[j]));
+    // delete k;
   }
   if (insert_ratio > 0) {
     non_exist_keys.reserve(num);
     for (size_t j = num; j < num * 2; ++j) {
-      index_key_t* k = new index_key_t(read_keys[j]);
-      non_exist_keys.push_back(*k);
+      // index_key_t* k = new index_key_t(read_keys[j]);
+      non_exist_keys.emplace_back(*reinterpret_cast<index_key_t*>(&read_keys[j]));
+      // delete k;
     }
   }
 }
@@ -480,6 +495,7 @@ void *run_fg(void *param) {
   while (running) {
     double d = ratio_dis(gen);
     if (d <= read_ratio) {  // get
+      // COUT_THIS("Get key " << *reinterpret_cast<uint64_t*>(&op_keys[(query_i + delete_i) % op_keys.size()]));
       res = table->get(op_keys[(query_i + delete_i) % op_keys.size()],
                        dummy_value, thread_id);
       query_i++;
@@ -487,6 +503,7 @@ void *run_fg(void *param) {
         query_i = 0;
       }
     } else if (d <= read_ratio + update_ratio) {  // update
+      // COUT_THIS("Update key " << op_keys[(update_i + delete_i) % op_keys.size()]);
       res = table->put(op_keys[(update_i + delete_i) % op_keys.size()],
                        dummy_value, thread_id);
       update_i++;
@@ -494,6 +511,7 @@ void *run_fg(void *param) {
         update_i = 0;
       }
     } else if (d <= read_ratio + update_ratio + insert_ratio) {  // insert
+      // COUT_THIS("Insert key " << op_keys[insert_i]);
       res = table->put(op_keys[insert_i], dummy_value, thread_id);
       insert_i++;
       if (unlikely(insert_i == op_keys.size())) {
@@ -536,6 +554,7 @@ void run_benchmark(sindex_t *table, size_t sec) {
     fg_params[worker_i].table = table;
     fg_params[worker_i].thread_id = worker_i;
     fg_params[worker_i].throughput = 0;
+    COUT_THIS("create thread run_fg");
     int ret = pthread_create(&threads[worker_i], nullptr, run_fg,
                              (void *)&fg_params[worker_i]);
     if (ret) {

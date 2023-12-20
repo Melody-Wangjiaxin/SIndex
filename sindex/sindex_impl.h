@@ -120,6 +120,7 @@ void *SIndex<key_t, val_t, seq>::background(void *this_) {
     info[bg_i].running = true;
     info[bg_i].should_update_array = false;
 
+    COUT_THIS("create thread do adjustment");
     int ret = pthread_create(&threads[bg_i], nullptr, root_t::do_adjustment,
                              &info[bg_i]);
     if (ret) {
@@ -206,6 +207,7 @@ void *SIndex<key_t, val_t, seq>::background(void *this_) {
 template <class key_t, class val_t, bool seq>
 void SIndex<key_t, val_t, seq>::start_bg() {
   bg_running = true;
+  COUT_THIS("create thread background");
   int ret = pthread_create(&bg_master, nullptr, background, this);
   if (ret) {
     COUT_N_EXIT("Error: unable to create background thread," << ret);

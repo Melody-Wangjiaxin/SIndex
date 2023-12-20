@@ -18,8 +18,10 @@
 #include "lib/sindex.h"
 #include "lib/helper.h"
 #include "lib/sindex_impl.h"
+#include "core/core_workload.h"
 
 using std::string;
+using namespace ycsbc;
 
 template <size_t len>
 class StrKey {
@@ -40,7 +42,11 @@ public:
 	}
 
 	StrKey() { memset(&buf, 0, len); }
-	StrKey(uint64_t key) { COUT_N_EXIT("str key no uint64"); }
+	StrKey(const uint64_t key) { 
+    memset(&buf, 0, len);
+    memcpy(&buf, &key, sizeof(key));
+    // COUT_N_EXIT("str key no uint64"); 
+  }
 	StrKey(const std::string &s) {
 		memset(&buf, 0, len);
 		memcpy(&buf, s.data(), s.size());
@@ -129,23 +135,23 @@ std::atomic<size_t> ready_threads(0);
 std::vector<index_key_t> exist_keys;
 std::vector<index_key_t> non_exist_keys;
 
+extern std::string test_type;;
 void *run_fg(void *arguments);
+void run_benchmark(size_t sec, ycsbc::CoreWorkload* workload_, ycsbc::DB* db_);
 
-
-// class args {
-// 	public:
-// 		void *param;
-// 		ycsbc::CoreWorkload* workload_;
-// 		ycsbc::DB* db_;
+class args {
+	public:
+		void *param;
+		ycsbc::CoreWorkload* workload_;
+		ycsbc::DB* db_;
 		
-// 		args(void *param, ycsbc::CoreWorkload* workload_, ycsbc::DB* db_)
-// 		{
-// 			this->param = param;
-// 			this->workload_ = workload_;
-// 			this->db_ = db_;
-// 		}
-
-// };
+		args(void *param, ycsbc::CoreWorkload* workload_, ycsbc::DB* db_)
+		{
+			this->param = param;
+			this->workload_ = workload_;
+			this->db_ = db_;
+		}
+};
 
 namespace ycsbc {
 
@@ -166,21 +172,16 @@ class SIndexDB : public DB {
            const std::vector<std::string> *fields,
            std::vector<KVPair> &result)
 	{
-		pid_t tid = gettid();
-		thread_id = (uint32_t)tid;
-		// COUT_THIS("thread_id = " << thread_id);
 		uint64_t val;
+		uint64_t tmp_key = stoull(key.substr(4));
+		tab_xi->get(*reinterpret_cast<index_key_t*>(&tmp_key), dummy_value, (uint32_t)gettid());
 		// for(size_t i = 0; i < 10; i++){
 		// 	std::string field = "field" + i;
 		// 	StrKey<64>* strKey = new StrKey<64>(key + field);
 		// 	tab_xi->get(*strKey, val, thread_id);
 		// 	result.push_back(make_pair(key, std::to_string(val)));
 		// }
-
-		StrKey<64>* strKey = new StrKey<64>(key);
-		tab_xi->get(*strKey, val, thread_id);
-		result.push_back(make_pair(key, std::to_string(val)));
-
+		// result.push_back(make_pair(key, std::to_string(val)));
 		return DB::kOK;
 	}
 
@@ -188,20 +189,17 @@ class SIndexDB : public DB {
            int len, const std::vector<std::string> *fields,
            std::vector<std::vector<KVPair>> &result)
 	{
-		pid_t tid = gettid();
-		thread_id = (uint32_t)tid;
-		// COUT_THIS("thread_id = " << thread_id);
 		std::vector<std::pair<index_key_t, uint64_t>> res;
-
 		// for(size_t i = 0; i < 10; i++){
 		// 	res.clear();
 		// 	std::string field = "field" + i;
 		// 	StrKey<64>* strKey = new StrKey<64>(key + field);
 		// 	tab_xi->scan(*strKey, len, res, thread_id);
 		// }
-
-		StrKey<64>* strKey = new StrKey<64>(key);
-		tab_xi->scan(*strKey, len, res, thread_id);
+		uint64_t tmp_key = stoull(key.substr(4));
+		tab_xi->scan(*reinterpret_cast<index_key_t*>(&tmp_key), len, res, (uint32_t)gettid());
+		// StrKey<64>* strKey = new StrKey<64>(key);
+		// tab_xi->scan(*strKey, len, res, thread_id);
 
 		return DB::kOK;
 	}
@@ -209,24 +207,15 @@ class SIndexDB : public DB {
   int Update(const std::string &table, const std::string &key,
              std::vector<KVPair> &values)
 	{
-		// COUT_THIS("Update tab_key = " << key << "key = " << values[0].first << " values " << values[0].second);
-		pid_t tid = gettid();
-		thread_id = (uint32_t)tid;
-		// COUT_THIS("thread_id = " << thread_id);
-		// StrKey<64>* strKey = new StrKey<64>(key + values[0].first);
-		StrKey<64>* strKey = new StrKey<64>(key);
+		uint64_t tmp_key = stoull(key.substr(4));
 		uint64_t val = 1234;
-		tab_xi->put(*strKey, val, thread_id);
+		tab_xi->put(*reinterpret_cast<index_key_t*>(&tmp_key), val, (uint32_t)gettid());
 		return DB::kOK;
 	}
 
   int Insert(const std::string &table, const std::string &key,
              std::vector<KVPair> &values)
 	{
-		// COUT_THIS("Insert tab_key = " << key);
-		pid_t tid = gettid();
-		thread_id = (uint32_t)tid;
-		// COUT_THIS("thread_id = " << thread_id);
 		// for(KVPair kv: values){
 		// 	StrKey<64>* strKey = new StrKey<64>(key + kv.first);
 		// 	std::string value = kv.second;
@@ -234,92 +223,32 @@ class SIndexDB : public DB {
 		// 	uint64_t val = 1234;
 		// 	tab_xi->put(*strKey, val, thread_id);
 		// }
-
-		StrKey<64>* strKey = new StrKey<64>(key);
+		// StrKey<64>* strKey = new StrKey<64>(key)
+		uint64_t tmp_key = stoull(key.substr(4));;
 		uint64_t val = 1234;
-		tab_xi->put(*strKey, val, thread_id);
+		tab_xi->put(*reinterpret_cast<index_key_t*>(&tmp_key), val, (uint32_t)gettid());
 
 		return DB::kOK;
 	}
 
   int Delete(const std::string &table, const std::string &key)
 	{
-		pid_t tid = gettid();
-		thread_id = (uint32_t)tid;
-		// COUT_THIS("thread_id = " << thread_id);
 		// for(size_t i = 0; i < 10; i++){
 		// 	std::string field = "field" + i;
 		// 	StrKey<64>* strKey = new StrKey<64>(key + field);
 		// 	tab_xi->remove(*strKey, thread_id);
 		// }
-
-		StrKey<64>* strKey = new StrKey<64>(key);
-
-		tab_xi->remove(*strKey, thread_id);
+		// StrKey<64>* strKey = new StrKey<64>(key);
+		uint64_t tmp_key = stoull(key.substr(4));
+		tab_xi->remove(*reinterpret_cast<index_key_t*>(&tmp_key), (uint32_t)gettid());
 		return DB::kOK;
 	}
 
-	// void run_benchmark(size_t sec, CoreWorkload* workload_) {
-	// 	pthread_t threads[fg_n];
-	// 	fg_param_t fg_params[fg_n];
-	// 	// check if parameters are cacheline aligned
-	// 	for (size_t i = 0; i < fg_n; i++) {
-	// 		if ((uint64_t)(&(fg_params[i])) % CACHELINE_SIZE != 0) {
-	// 			COUT_N_EXIT("wrong parameter address: " << &(fg_params[i]));
-	// 		}
-	// 	}
-
-	// 	running = false;
-	// 	for (size_t worker_i = 0; worker_i < fg_n; worker_i++) {
-	// 		fg_params[worker_i].table = tab_xi;
-	// 		fg_params[worker_i].thread_id = worker_i;
-	// 		fg_params[worker_i].throughput = 0;
-
-	// 		args* a = new args((void *)&fg_params[worker_i], workload_, this);
-	// 		// a->param = ;
-	// 		// a->workload_ = ;
-	// 		// a->db_ = this;
-
-	// 		int ret = pthread_create(&threads[worker_i], nullptr, run_fg,
-	// 														(void*)a);
-	// 		if (ret) {
-	// 			COUT_N_EXIT("Error:" << ret);
-	// 		}
-	// 	}
-
-	// 	COUT_THIS("[micro] prepare data ...");
-	// 	while (ready_threads < fg_n) sleep(1);
-
-	// 	running = true;
-	// 	std::vector<size_t> tput_history(fg_n, 0);
-	// 	size_t current_sec = 0;
-	// 	while (current_sec < sec) {
-	// 		sleep(1);
-	// 		uint64_t tput = 0;
-	// 		for (size_t i = 0; i < fg_n; i++) {
-	// 			tput += fg_params[i].throughput - tput_history[i];
-	// 			tput_history[i] = fg_params[i].throughput;
-	// 		}
-	// 		COUT_THIS("[micro] >>> sec " << current_sec << " throughput: " << tput);
-	// 		++current_sec;
-	// 	}
-
-	// 	running = false;
-	// 	void *status;
-	// 	for (size_t i = 0; i < fg_n; i++) {
-	// 		int rc = pthread_join(threads[i], &status);
-	// 		if (rc) {
-	// 			COUT_N_EXIT("Error:unable to join," << rc);
-	// 		}
-	// 	}
-
-	// 	size_t throughput = 0;
-	// 	for (auto &p : fg_params) {
-	// 		throughput += p.throughput;
-	// 	}
-	// 	COUT_THIS("[micro] Throughput(op/s): " << throughput / sec);
-	// }
-
+	sindex_t *get_tabxi()
+	{
+		return tab_xi;
+	}
+	
  private:
   sindex_t *tab_xi;
   uint32_t thread_id;
@@ -459,14 +388,10 @@ class SIndexDB : public DB {
   inline void prepare_sindex(sindex_t *&table, std::vector<std::string> keys)
 	{
 		// prepare data
-		std::random_device rd;
-		std::mt19937 gen(rd());
-		std::uniform_int_distribution<int64_t> rand_int8(
-				0, std::numeric_limits<uint8_t>::max());
 		exist_keys.reserve(keys.size());
 		for (size_t i = 0; i < keys.size(); ++i) {
-			index_key_t* k = new index_key_t(keys[i]);
-			exist_keys.push_back(*k);
+			uint64_t tmp_key = stoull(keys[i].substr(4));
+			exist_keys.push_back(*reinterpret_cast<index_key_t*>(&tmp_key));
 		}
 		COUT_VAR(exist_keys.size());
 		COUT_VAR(non_exist_keys.size());
@@ -476,140 +401,147 @@ class SIndexDB : public DB {
 		std::vector<uint64_t> vals(exist_keys.size(), 1);
 		table = new sindex_t(exist_keys, vals, fg_n, bg_n);
 	}
-
-	
-	
-
 };
 
-// void *run_fg(void *arguments) {
-// 	// args* args = arguments;
-// 	void *param = ((args*)arguments)->param;
-// 	ycsbc::CoreWorkload &workload_ = *(((args*)arguments)->workload_);
-// 	ycsbc::DB &db_ = *(((args*)arguments)->db_);
-
-// 	fg_param_t &thread_param = *(fg_param_t *)param;
-// 	uint32_t thread_id = thread_param.thread_id;
-// 	sindex_t *table = thread_param.table;
-
-// 	std::random_device rd;
-// 	std::mt19937 gen(rd());
-// 	std::uniform_real_distribution<> ratio_dis(0, 1);
-
-// 	size_t exist_key_n_per_thread = exist_keys.size() / fg_n;
-// 	size_t exist_key_start = thread_id * exist_key_n_per_thread;
-// 	size_t exist_key_end = (thread_id + 1) * exist_key_n_per_thread;
-// 	std::vector<index_key_t> op_keys(exist_keys.begin() + exist_key_start,
-// 																	exist_keys.begin() + exist_key_end);
-
-// 	if (non_exist_keys.size() > 0) {
-// 		size_t non_exist_key_n_per_thread = non_exist_keys.size() / fg_n;
-// 		size_t non_exist_key_start = thread_id * non_exist_key_n_per_thread,
-// 					non_exist_key_end = (thread_id + 1) * non_exist_key_n_per_thread;
-// 		op_keys.insert(op_keys.end(), non_exist_keys.begin() + non_exist_key_start,
-// 									non_exist_keys.begin() + non_exist_key_end);
-// 	}
-
-// 	COUT_THIS("[micro] Worker" << thread_id << " Ready.");
-// 	size_t query_i = 0, insert_i = op_keys.size() / 2, delete_i = 0, update_i = 0;
-// 	// exsiting keys fall within range [delete_i, insert_i)
-// 	ready_threads++;
-// 	volatile bool res = false;
-// 	uint64_t dummy_value = 1234;
-// 	UNUSED(res);
-
-// 	while (!running)
-// 		;
-
-// 	while (running) {
-// 		switch (workload_.NextOperation()) {
-// 			case READ:
-// 			{
-// 				const std::string &table = workload_.NextTable();
-// 				const std::string &key = workload_.NextTransactionKey();
-// 				std::vector<DB::KVPair> result;
-// 				if (!workload_.read_all_fields()) {
-// 					std::vector<std::string> fields;
-// 					fields.push_back("field" + workload_.NextFieldName());
-// 					db_.Read(table, key, &fields, result);
-// 				} else {
-// 					db_.Read(table, key, NULL, result);
-// 				}
-// 				break;
-// 			}
-// 			case UPDATE:
-// 			{
-// 				const std::string &table = workload_.NextTable();
-// 				const std::string &key = workload_.NextTransactionKey();
-// 				std::vector<DB::KVPair> values;
-// 				if (workload_.write_all_fields()) {
-// 					workload_.BuildValues(values);
-// 				} else {
-// 					workload_.BuildUpdate(values);
-// 				}
-// 				db_.Update(table, key, values);
-// 				break;
-// 			}
-				
-// 			case INSERT:
-// 			{
-// 				const std::string &table = workload_.NextTable();
-// 				const std::string &key = workload_.NextSequenceKey();
-// 				std::vector<DB::KVPair> values;
-// 				workload_.BuildValues(values);
-// 				db_.Insert(table, key, values);
-// 				break;
-// 			}
-				
-// 			case SCAN:
-// 			{
-// 				const std::string &table = workload_.NextTable();
-// 				const std::string &key = workload_.NextTransactionKey();
-// 				int len = workload_.NextScanLength();
-// 				std::vector<std::vector<DB::KVPair>> result;
-// 				if (!workload_.read_all_fields()) {
-// 					std::vector<std::string> fields;
-// 					fields.push_back("field" + workload_.NextFieldName());
-// 					db_.Scan(table, key, len, &fields, result);
-// 				} else {
-// 					db_.Scan(table, key, len, NULL, result);
-// 				}
-// 				break;
-// 			}
-				
-// 			case READMODIFYWRITE:
-// 			{
-// 				const std::string &table = workload_.NextTable();
-// 				const std::string &key = workload_.NextTransactionKey();
-// 				std::vector<DB::KVPair> result;
-
-// 				if (!workload_.read_all_fields()) {
-// 					std::vector<std::string> fields;
-// 					fields.push_back("field" + workload_.NextFieldName());
-// 					db_.Read(table, key, &fields, result);
-// 				} else {
-// 					db_.Read(table, key, NULL, result);
-// 				}
-
-// 				std::vector<DB::KVPair> values;
-// 				if (workload_.write_all_fields()) {
-// 					workload_.BuildValues(values);
-// 				} else {
-// 					workload_.BuildUpdate(values);
-// 				}
-// 				db_.Update(table, key, values);
-// 				break;
-// 			}
-				
-// 			default:
-// 				throw utils::Exception("Operation request is not recognized!");
-// 		}
-// 		thread_param.throughput++;
-// 	}
-
-// 	pthread_exit(nullptr);
-// }
-
 } // ycsbc
+
+void *run_fg(void *arguments) {
+	// args* args = arguments;
+	void *param = ((args*)arguments)->param;
+	ycsbc::CoreWorkload &workload_ = *(((args*)arguments)->workload_);
+	ycsbc::DB &db_ = *(((args*)arguments)->db_);
+
+	fg_param_t &thread_param = *(fg_param_t *)param;
+	uint32_t thread_id = thread_param.thread_id;
+	sindex_t *table = thread_param.table;
+
+	COUT_THIS("[micro] Worker" << thread_id << " Ready.");
+	ready_threads++;
+	volatile bool res = false;
+	uint64_t dummy_value = 1234;
+	UNUSED(res);
+
+	while (!running)
+		;
+
+	while (running) {
+		switch (workload_.NextOperation()) {
+			case READ:
+			{
+				const std::string &key = workload_.NextTransactionKey();
+				sindex_t *tab = ((ycsbc::SIndexDB*)&db_)->get_tabxi();
+				uint64_t tmp_key = stoull(key.substr(4));
+				tab->get(*reinterpret_cast<index_key_t*>(&tmp_key), dummy_value, thread_id);
+				break;
+			}
+			case UPDATE:
+			{
+				const std::string &key = workload_.NextTransactionKey();
+				std::vector<DB::KVPair> values;
+				sindex_t *tab = ((ycsbc::SIndexDB*)&db_)->get_tabxi();
+				uint64_t tmp_key = stoull(key.substr(4));
+				tab->put(*reinterpret_cast<index_key_t*>(&tmp_key), dummy_value, thread_id);
+				break;
+			}
+			
+			case INSERT:
+			{
+				const std::string &key = workload_.NextSequenceKey();
+				sindex_t *tab = ((ycsbc::SIndexDB*)&db_)->get_tabxi();
+				uint64_t tmp_key = stoull(key.substr(4));
+				tab->put(*reinterpret_cast<index_key_t*>(&tmp_key), dummy_value, thread_id);
+				break;
+			}
+			
+			case SCAN:
+			{
+				const std::string &key = workload_.NextTransactionKey();
+				int len = workload_.NextScanLength();
+				sindex_t *tab = ((ycsbc::SIndexDB*)&db_)->get_tabxi();
+				std::vector<std::pair<index_key_t, uint64_t>> results;
+				uint64_t tmp_key = stoull(key.substr(4));
+				tab->scan(*reinterpret_cast<index_key_t*>(&tmp_key), len, results, thread_id);
+				break;
+			}
+			
+			case READMODIFYWRITE:
+			{
+				const std::string &key = workload_.NextTransactionKey();
+				std::vector<DB::KVPair> result;
+				sindex_t *tab = ((ycsbc::SIndexDB*)&db_)->get_tabxi();
+				uint64_t tmp_key = stoull(key.substr(4));
+				tab->get(*reinterpret_cast<index_key_t*>(&tmp_key), dummy_value, thread_id);
+				tab->put(*reinterpret_cast<index_key_t*>(&tmp_key), dummy_value, thread_id);
+				break;
+			}
+			
+			default:
+				throw utils::Exception("Operation request is not recognized!");
+		}
+		thread_param.throughput++;
+	}
+
+	pthread_exit(nullptr);
+}
+
+
+
+using ycsbc::SIndexDB;
+void run_benchmark(size_t sec, ycsbc::CoreWorkload* workload_, ycsbc::DB* db_) {
+	pthread_t threads[fg_n];
+	fg_param_t fg_params[fg_n];
+	// check if parameters are cacheline aligned
+	for (size_t i = 0; i < fg_n; i++) {
+		if ((uint64_t)(&(fg_params[i])) % CACHELINE_SIZE != 0) {
+			COUT_N_EXIT("wrong parameter address: " << &(fg_params[i]));
+		}
+	}
+
+	running = false;
+	for (size_t worker_i = 0; worker_i < fg_n; worker_i++) {
+		fg_params[worker_i].table = ((ycsbc::SIndexDB*)db_)->get_tabxi();
+		fg_params[worker_i].thread_id = worker_i;
+		fg_params[worker_i].throughput = 0;
+
+		args* a = new args((void *)&fg_params[worker_i], workload_, db_);
+
+		int ret = pthread_create(&threads[worker_i], nullptr, run_fg, (void*)a);
+		if (ret) {
+			COUT_N_EXIT("Error:" << ret);
+		}
+	}
+
+	COUT_THIS("[micro] prepare data ...");
+	while (ready_threads < fg_n) sleep(1);
+
+	running = true;
+	std::vector<size_t> tput_history(fg_n, 0);
+	size_t current_sec = 0;
+	while (current_sec < sec) {
+		sleep(1);
+		uint64_t tput = 0;
+		for (size_t i = 0; i < fg_n; i++) {
+			tput += fg_params[i].throughput - tput_history[i];
+			tput_history[i] = fg_params[i].throughput;
+		}
+		COUT_THIS("[micro] >>> sec " << current_sec << " throughput: " << tput);
+		++current_sec;
+	}
+
+	running = false;
+	void *status;
+	for (size_t i = 0; i < fg_n; i++) {
+		int rc = pthread_join(threads[i], &status);
+		if (rc) {
+			COUT_N_EXIT("Error:unable to join," << rc);
+		}
+	}
+
+	size_t throughput = 0;
+	for (auto &p : fg_params) {
+		throughput += p.throughput;
+	}
+	COUT_THIS("[micro] Throughput(op/s): " << throughput / sec);
+}
 
 #endif // YCSB_C_SINDEX_DB_H_
