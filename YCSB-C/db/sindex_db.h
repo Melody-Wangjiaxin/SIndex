@@ -158,10 +158,7 @@ namespace ycsbc {
 class SIndexDB : public DB {
  public:
   
-	SIndexDB()
-	{
-		// prepare_sindex(tab_xi);
-	}
+	SIndexDB(){}
 
 	SIndexDB(std::vector<std::string> keys)
 	{
@@ -170,221 +167,25 @@ class SIndexDB : public DB {
 
   int Read(const std::string &table, const std::string &key,
            const std::vector<std::string> *fields,
-           std::vector<KVPair> &result)
-	{
-		uint64_t val;
-		uint64_t tmp_key = stoull(key.substr(4));
-		tab_xi->get(*reinterpret_cast<index_key_t*>(&tmp_key), dummy_value, (uint32_t)gettid());
-		// for(size_t i = 0; i < 10; i++){
-		// 	std::string field = "field" + i;
-		// 	StrKey<64>* strKey = new StrKey<64>(key + field);
-		// 	tab_xi->get(*strKey, val, thread_id);
-		// 	result.push_back(make_pair(key, std::to_string(val)));
-		// }
-		// result.push_back(make_pair(key, std::to_string(val)));
-		return DB::kOK;
-	}
+           std::vector<KVPair> &result);
 
   int Scan(const std::string &table, const std::string &key,
            int len, const std::vector<std::string> *fields,
-           std::vector<std::vector<KVPair>> &result)
-	{
-		std::vector<std::pair<index_key_t, uint64_t>> res;
-		// for(size_t i = 0; i < 10; i++){
-		// 	res.clear();
-		// 	std::string field = "field" + i;
-		// 	StrKey<64>* strKey = new StrKey<64>(key + field);
-		// 	tab_xi->scan(*strKey, len, res, thread_id);
-		// }
-		uint64_t tmp_key = stoull(key.substr(4));
-		tab_xi->scan(*reinterpret_cast<index_key_t*>(&tmp_key), len, res, (uint32_t)gettid());
-		// StrKey<64>* strKey = new StrKey<64>(key);
-		// tab_xi->scan(*strKey, len, res, thread_id);
-
-		return DB::kOK;
-	}
+           std::vector<std::vector<KVPair>> &result);
 
   int Update(const std::string &table, const std::string &key,
-             std::vector<KVPair> &values)
-	{
-		uint64_t tmp_key = stoull(key.substr(4));
-		uint64_t val = 1234;
-		tab_xi->put(*reinterpret_cast<index_key_t*>(&tmp_key), val, (uint32_t)gettid());
-		return DB::kOK;
-	}
+             std::vector<KVPair> &values);
 
   int Insert(const std::string &table, const std::string &key,
-             std::vector<KVPair> &values)
-	{
-		// for(KVPair kv: values){
-		// 	StrKey<64>* strKey = new StrKey<64>(key + kv.first);
-		// 	std::string value = kv.second;
-		// 	// COUT_THIS("key = " << kv.first << " value = " << kv.second);
-		// 	uint64_t val = 1234;
-		// 	tab_xi->put(*strKey, val, thread_id);
-		// }
-		// StrKey<64>* strKey = new StrKey<64>(key)
-		uint64_t tmp_key = stoull(key.substr(4));;
-		uint64_t val = 1234;
-		tab_xi->put(*reinterpret_cast<index_key_t*>(&tmp_key), val, (uint32_t)gettid());
+             std::vector<KVPair> &values);
 
-		return DB::kOK;
-	}
+  int Delete(const std::string &table, const std::string &key);
 
-  int Delete(const std::string &table, const std::string &key)
-	{
-		// for(size_t i = 0; i < 10; i++){
-		// 	std::string field = "field" + i;
-		// 	StrKey<64>* strKey = new StrKey<64>(key + field);
-		// 	tab_xi->remove(*strKey, thread_id);
-		// }
-		// StrKey<64>* strKey = new StrKey<64>(key);
-		uint64_t tmp_key = stoull(key.substr(4));
-		tab_xi->remove(*reinterpret_cast<index_key_t*>(&tmp_key), (uint32_t)gettid());
-		return DB::kOK;
-	}
-
-	sindex_t *get_tabxi()
-	{
-		return tab_xi;
-	}
+	sindex_t *get_tabxi() { return tab_xi; }
 	
  private:
   sindex_t *tab_xi;
   uint32_t thread_id;
-  inline void parse_args(int argc, char **argv)
-	{
-		struct option long_options[] = {
-				{"read", required_argument, 0, 'a'},
-				{"insert", required_argument, 0, 'b'},
-				{"remove", required_argument, 0, 'c'},
-				{"update", required_argument, 0, 'd'},
-				{"scan", required_argument, 0, 'e'},
-				{"table-size", required_argument, 0, 'f'},
-				{"runtime", required_argument, 0, 'g'},
-				{"fg", required_argument, 0, 'h'},
-				{"bg", required_argument, 0, 'i'},
-				{"sindex-root-err-bound", required_argument, 0, 'j'},
-				{"sindex-root-memory", required_argument, 0, 'k'},
-				{"sindex-group-err-bound", required_argument, 0, 'l'},
-				{"sindex-group-err-tolerance", required_argument, 0, 'm'},
-				{"sindex-buf-size-bound", required_argument, 0, 'n'},
-				{"sindex-buf-compact-threshold", required_argument, 0, 'o'},
-				{"sindex-partial-len", required_argument, 0, 'p'},
-				{"sindex-forward-step", required_argument, 0, 'q'},
-				{"sindex-backward-step", required_argument, 0, 'r'},
-				{0, 0, 0, 0}};
-		std::string ops = "a:b:c:d:e:f:g:h:i:j:k:l:m:n:o:p:q:r:";
-		int option_index = 0;
-
-		while (1) {
-			int c = getopt_long(argc, argv, ops.c_str(), long_options, &option_index);
-			if (c == -1) break;
-
-			switch (c) {
-				case 0:
-					if (long_options[option_index].flag != 0) break;
-					abort();
-					break;
-				case 'a':
-					read_ratio = strtod(optarg, NULL);
-					INVARIANT(read_ratio >= 0 && read_ratio <= 1);
-					break;
-				case 'b':
-					insert_ratio = strtod(optarg, NULL);
-					INVARIANT(insert_ratio >= 0 && insert_ratio <= 1);
-					break;
-				case 'c':
-					delete_ratio = strtod(optarg, NULL);
-					INVARIANT(delete_ratio >= 0 && delete_ratio <= 1);
-					break;
-				case 'd':
-					update_ratio = strtod(optarg, NULL);
-					INVARIANT(update_ratio >= 0 && update_ratio <= 1);
-					break;
-				case 'e':
-					scan_ratio = strtod(optarg, NULL);
-					INVARIANT(scan_ratio >= 0 && scan_ratio <= 1);
-					break;
-				case 'f':
-					table_size = strtoul(optarg, NULL, 10);
-					INVARIANT(table_size > 0);
-					break;
-				case 'g':
-					runtime = strtoul(optarg, NULL, 10);
-					INVARIANT(runtime > 0);
-					break;
-				case 'h':
-					fg_n = strtoul(optarg, NULL, 10);
-					INVARIANT(fg_n > 0);
-					break;
-				case 'i':
-					bg_n = strtoul(optarg, NULL, 10);
-					break;
-				case 'j':
-					sindex::config.root_error_bound = strtol(optarg, NULL, 10);
-					INVARIANT(sindex::config.root_error_bound > 0);
-					break;
-				case 'k':
-					sindex::config.root_memory_constraint =
-							strtol(optarg, NULL, 10) * 1024 * 1024;
-					INVARIANT(sindex::config.root_memory_constraint > 0);
-					break;
-				case 'l':
-					sindex::config.group_error_bound = strtol(optarg, NULL, 10);
-					INVARIANT(sindex::config.group_error_bound > 0);
-					break;
-				case 'm':
-					sindex::config.group_error_tolerance = strtol(optarg, NULL, 10);
-					INVARIANT(sindex::config.group_error_tolerance > 0);
-					break;
-				case 'n':
-					sindex::config.buffer_size_bound = strtol(optarg, NULL, 10);
-					INVARIANT(sindex::config.buffer_size_bound > 0);
-					break;
-				case 'o':
-					sindex::config.buffer_compact_threshold = strtol(optarg, NULL, 10);
-					INVARIANT(sindex::config.buffer_compact_threshold > 0);
-					break;
-				case 'p':
-					sindex::config.partial_len_bound = strtol(optarg, NULL, 10);
-					INVARIANT(sindex::config.partial_len_bound > 0);
-					break;
-				case 'q':
-					sindex::config.forward_step = strtol(optarg, NULL, 10);
-					INVARIANT(sindex::config.forward_step > 0);
-					break;
-				case 'r':
-					sindex::config.backward_step = strtol(optarg, NULL, 10);
-					INVARIANT(sindex::config.backward_step > 0);
-					break;
-
-				default:
-					abort();
-			}
-		}
-
-		COUT_THIS("[micro] Read:Insert:Update:Delete:Scan = "
-							<< read_ratio << ":" << insert_ratio << ":" << update_ratio << ":"
-							<< delete_ratio << ":" << scan_ratio)
-		double ratio_sum =
-				read_ratio + insert_ratio + delete_ratio + scan_ratio + update_ratio;
-		INVARIANT(ratio_sum > 0.9999 && ratio_sum < 1.0001);  // avoid precision lost
-		COUT_VAR(runtime);
-		COUT_VAR(fg_n);
-		COUT_VAR(bg_n);
-		COUT_VAR(sindex::config.root_error_bound);
-		COUT_VAR(sindex::config.root_memory_constraint);
-		COUT_VAR(sindex::config.group_error_bound);
-		COUT_VAR(sindex::config.group_error_tolerance);
-		COUT_VAR(sindex::config.buffer_size_bound);
-		COUT_VAR(sindex::config.buffer_size_tolerance);
-		COUT_VAR(sindex::config.buffer_compact_threshold);
-		COUT_VAR(sindex::config.partial_len_bound);
-		COUT_VAR(sindex::config.forward_step);
-		COUT_VAR(sindex::config.backward_step);
-	}
-
   inline void prepare_sindex(sindex_t *&table, std::vector<std::string> keys)
 	{
 		// prepare data
@@ -401,9 +202,87 @@ class SIndexDB : public DB {
 		std::vector<uint64_t> vals(exist_keys.size(), 1);
 		table = new sindex_t(exist_keys, vals, fg_n, bg_n);
 	}
+
 };
 
 } // ycsbc
+
+
+int SIndexDB::Read(const std::string &table, const std::string &key,
+           const std::vector<std::string> *fields,
+           std::vector<KVPair> &result)
+{
+	uint64_t val;
+	uint64_t tmp_key = stoull(key.substr(4));
+	tab_xi->get(*reinterpret_cast<index_key_t*>(&tmp_key), dummy_value, (uint32_t)gettid());
+	// for(size_t i = 0; i < 10; i++){
+	// 	std::string field = "field" + i;
+	// 	StrKey<64>* strKey = new StrKey<64>(key + field);
+	// 	tab_xi->get(*strKey, val, thread_id);
+	// 	result.push_back(make_pair(key, std::to_string(val)));
+	// }
+	// result.push_back(make_pair(key, std::to_string(val)));
+	return DB::kOK;
+}
+
+int SIndexDB::Scan(const std::string &table, const std::string &key,
+           int len, const std::vector<std::string> *fields,
+           std::vector<std::vector<KVPair>> &result)
+{
+	std::vector<std::pair<index_key_t, uint64_t>> res;
+	// for(size_t i = 0; i < 10; i++){
+	// 	res.clear();
+	// 	std::string field = "field" + i;
+	// 	StrKey<64>* strKey = new StrKey<64>(key + field);
+	// 	tab_xi->scan(*strKey, len, res, thread_id);
+	// }
+	uint64_t tmp_key = stoull(key.substr(4));
+	tab_xi->scan(*reinterpret_cast<index_key_t*>(&tmp_key), len, res, (uint32_t)gettid());
+	// StrKey<64>* strKey = new StrKey<64>(key);
+	// tab_xi->scan(*strKey, len, res, thread_id);
+
+	return DB::kOK;
+}
+
+int SIndexDB::Update(const std::string &table, const std::string &key,
+             std::vector<KVPair> &values)
+{
+	uint64_t tmp_key = stoull(key.substr(4));
+	uint64_t val = 1234;
+	tab_xi->put(*reinterpret_cast<index_key_t*>(&tmp_key), val, (uint32_t)gettid());
+	return DB::kOK;
+}
+
+int SIndexDB::Insert(const std::string &table, const std::string &key,
+             std::vector<KVPair> &values)
+{
+	// for(KVPair kv: values){
+	// 	StrKey<64>* strKey = new StrKey<64>(key + kv.first);
+	// 	std::string value = kv.second;
+	// 	// COUT_THIS("key = " << kv.first << " value = " << kv.second);
+	// 	uint64_t val = 1234;
+	// 	tab_xi->put(*strKey, val, thread_id);
+	// }
+	// StrKey<64>* strKey = new StrKey<64>(key)
+	uint64_t tmp_key = stoull(key.substr(4));;
+	uint64_t val = 1234;
+	tab_xi->put(*reinterpret_cast<index_key_t*>(&tmp_key), val, (uint32_t)gettid());
+
+	return DB::kOK;
+}
+
+int SIndexDB::Delete(const std::string &table, const std::string &key)
+{
+	// for(size_t i = 0; i < 10; i++){
+	// 	std::string field = "field" + i;
+	// 	StrKey<64>* strKey = new StrKey<64>(key + field);
+	// 	tab_xi->remove(*strKey, thread_id);
+	// }
+	// StrKey<64>* strKey = new StrKey<64>(key);
+	uint64_t tmp_key = stoull(key.substr(4));
+	tab_xi->remove(*reinterpret_cast<index_key_t*>(&tmp_key), (uint32_t)gettid());
+	return DB::kOK;
+}
 
 void *run_fg(void *arguments) {
 	// args* args = arguments;
@@ -419,6 +298,7 @@ void *run_fg(void *arguments) {
 	ready_threads++;
 	volatile bool res = false;
 	uint64_t dummy_value = 1234;
+	sindex_t *tab = ((ycsbc::SIndexDB*)&db_)->get_tabxi();
 	UNUSED(res);
 
 	while (!running)
@@ -429,7 +309,6 @@ void *run_fg(void *arguments) {
 			case READ:
 			{
 				const std::string &key = workload_.NextTransactionKey();
-				sindex_t *tab = ((ycsbc::SIndexDB*)&db_)->get_tabxi();
 				uint64_t tmp_key = stoull(key.substr(4));
 				tab->get(*reinterpret_cast<index_key_t*>(&tmp_key), dummy_value, thread_id);
 				break;
@@ -438,7 +317,6 @@ void *run_fg(void *arguments) {
 			{
 				const std::string &key = workload_.NextTransactionKey();
 				std::vector<DB::KVPair> values;
-				sindex_t *tab = ((ycsbc::SIndexDB*)&db_)->get_tabxi();
 				uint64_t tmp_key = stoull(key.substr(4));
 				tab->put(*reinterpret_cast<index_key_t*>(&tmp_key), dummy_value, thread_id);
 				break;
@@ -447,7 +325,6 @@ void *run_fg(void *arguments) {
 			case INSERT:
 			{
 				const std::string &key = workload_.NextSequenceKey();
-				sindex_t *tab = ((ycsbc::SIndexDB*)&db_)->get_tabxi();
 				uint64_t tmp_key = stoull(key.substr(4));
 				tab->put(*reinterpret_cast<index_key_t*>(&tmp_key), dummy_value, thread_id);
 				break;
@@ -457,7 +334,6 @@ void *run_fg(void *arguments) {
 			{
 				const std::string &key = workload_.NextTransactionKey();
 				int len = workload_.NextScanLength();
-				sindex_t *tab = ((ycsbc::SIndexDB*)&db_)->get_tabxi();
 				std::vector<std::pair<index_key_t, uint64_t>> results;
 				uint64_t tmp_key = stoull(key.substr(4));
 				tab->scan(*reinterpret_cast<index_key_t*>(&tmp_key), len, results, thread_id);
@@ -468,7 +344,6 @@ void *run_fg(void *arguments) {
 			{
 				const std::string &key = workload_.NextTransactionKey();
 				std::vector<DB::KVPair> result;
-				sindex_t *tab = ((ycsbc::SIndexDB*)&db_)->get_tabxi();
 				uint64_t tmp_key = stoull(key.substr(4));
 				tab->get(*reinterpret_cast<index_key_t*>(&tmp_key), dummy_value, thread_id);
 				tab->put(*reinterpret_cast<index_key_t*>(&tmp_key), dummy_value, thread_id);
@@ -484,9 +359,6 @@ void *run_fg(void *arguments) {
 	pthread_exit(nullptr);
 }
 
-
-
-using ycsbc::SIndexDB;
 void run_benchmark(size_t sec, ycsbc::CoreWorkload* workload_, ycsbc::DB* db_) {
 	pthread_t threads[fg_n];
 	fg_param_t fg_params[fg_n];
