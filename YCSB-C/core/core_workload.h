@@ -151,7 +151,9 @@ class CoreWorkload {
   
   virtual std::string NextTable() { return table_name_; }
   virtual std::string NextSequenceKey(); /// Used for loading data
+  virtual std::vector<uint64_t> NextSequenceKeyUint();
   virtual std::string NextTransactionKey(); /// Used for transactions
+  virtual std::vector<uint64_t> NextTransactionKeyUint();
   virtual Operation NextOperation() { return op_chooser_.Next(); }
   virtual std::string NextFieldName();
   virtual size_t NextScanLength() { return scan_len_chooser_->Next(); }
@@ -199,12 +201,31 @@ inline std::string CoreWorkload::NextSequenceKey() {
   return BuildKeyName(key_num);
 }
 
+inline std::vector<uint64_t> CoreWorkload::NextSequenceKeyUint() {
+  uint64_t key_num = key_generator_->Next();
+  if (!ordered_inserts_) {
+    key_num = utils::Hash(key_num);
+  }
+  return std::vector<uint64_t>(1, key_num);
+}
+
 inline std::string CoreWorkload::NextTransactionKey() {
   uint64_t key_num;
   do {
     key_num = key_chooser_->Next();
   } while (key_num > insert_key_sequence_.Last());
   return BuildKeyName(key_num);
+}
+
+inline std::vector<uint64_t> CoreWorkload::NextTransactionKeyUint() {
+  uint64_t key_num;
+  do {
+    key_num = key_chooser_->Next();
+  } while (key_num > insert_key_sequence_.Last());
+  if (!ordered_inserts_) {
+    key_num = utils::Hash(key_num);
+  }
+  return std::vector<uint64_t>(1, key_num);
 }
 
 inline std::string CoreWorkload::BuildKeyName(uint64_t key_num) {

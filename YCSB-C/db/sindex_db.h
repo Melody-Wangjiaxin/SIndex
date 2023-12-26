@@ -19,6 +19,7 @@
 #include "lib/helper.h"
 #include "lib/sindex_impl.h"
 #include "core/core_workload.h"
+#include "core/timer.h"
 
 using std::string;
 using namespace ycsbc;
@@ -42,9 +43,9 @@ public:
 	}
 
 	StrKey() { memset(&buf, 0, len); }
-	StrKey(const uint64_t key) { 
+	StrKey(const std::vector<uint64_t> key) { 
     memset(&buf, 0, len);
-    memcpy(&buf, &key, sizeof(key));
+    memcpy(&buf, key.data(), key.size() * 8);
     // COUT_N_EXIT("str key no uint64"); 
   }
 	StrKey(const std::string &s) {
@@ -160,9 +161,13 @@ class SIndexDB : public DB {
   
 	SIndexDB(){}
 
-	SIndexDB(std::vector<std::string> keys)
+	SIndexDB(std::vector<std::vector<uint64_t>> keys)
 	{
 		if(keys.size() != 0) prepare_sindex(tab_xi, keys);
+	}
+
+	~SIndexDB(){
+		if(tab_xi) delete tab_xi;
 	}
 
   int Read(const std::string &table, const std::string &key,
@@ -186,13 +191,13 @@ class SIndexDB : public DB {
  private:
   sindex_t *tab_xi;
   uint32_t thread_id;
-  inline void prepare_sindex(sindex_t *&table, std::vector<std::string> keys)
+  inline void prepare_sindex(sindex_t *&table, std::vector<std::vector<uint64_t>> keys)
 	{
 		// prepare data
 		exist_keys.reserve(keys.size());
 		for (size_t i = 0; i < keys.size(); ++i) {
-			uint64_t tmp_key = stoull(keys[i].substr(4));
-			exist_keys.push_back(*reinterpret_cast<index_key_t*>(&tmp_key));
+			// exist_keys.push_back(*reinterpret_cast<index_key_t*>(keys[i].data()));
+			exist_keys.push_back(StrKey<64>(keys[i]));
 		}
 		COUT_VAR(exist_keys.size());
 		COUT_VAR(non_exist_keys.size());
@@ -213,8 +218,9 @@ int SIndexDB::Read(const std::string &table, const std::string &key,
            std::vector<KVPair> &result)
 {
 	uint64_t val;
-	uint64_t tmp_key = stoull(key.substr(4));
-	tab_xi->get(*reinterpret_cast<index_key_t*>(&tmp_key), dummy_value, (uint32_t)gettid());
+	// uint64_t tmp_key = stoull(key.substr(4));
+	// uint64_t tmp_key[1] = {stoull(key.substr(4))};
+	tab_xi->get(*reinterpret_cast<const index_key_t*>(&key), dummy_value, (uint32_t)gettid());
 	// for(size_t i = 0; i < 10; i++){
 	// 	std::string field = "field" + i;
 	// 	StrKey<64>* strKey = new StrKey<64>(key + field);
@@ -236,8 +242,9 @@ int SIndexDB::Scan(const std::string &table, const std::string &key,
 	// 	StrKey<64>* strKey = new StrKey<64>(key + field);
 	// 	tab_xi->scan(*strKey, len, res, thread_id);
 	// }
-	uint64_t tmp_key = stoull(key.substr(4));
-	tab_xi->scan(*reinterpret_cast<index_key_t*>(&tmp_key), len, res, (uint32_t)gettid());
+	// uint64_t tmp_key = stoull(key.substr(4));
+	// uint64_t tmp_key[1] = {stoull(key.substr(4))};
+	tab_xi->scan(*reinterpret_cast<const index_key_t*>(&key), len, res, (uint32_t)gettid());
 	// StrKey<64>* strKey = new StrKey<64>(key);
 	// tab_xi->scan(*strKey, len, res, thread_id);
 
@@ -247,9 +254,10 @@ int SIndexDB::Scan(const std::string &table, const std::string &key,
 int SIndexDB::Update(const std::string &table, const std::string &key,
              std::vector<KVPair> &values)
 {
-	uint64_t tmp_key = stoull(key.substr(4));
+	// uint64_t tmp_key = stoull(key.substr(4));
+	// uint64_t tmp_key[1] = {stoull(key.substr(4))};
 	uint64_t val = 1234;
-	tab_xi->put(*reinterpret_cast<index_key_t*>(&tmp_key), val, (uint32_t)gettid());
+	tab_xi->put(*reinterpret_cast<const index_key_t*>(&key), val, (uint32_t)gettid());
 	return DB::kOK;
 }
 
@@ -264,9 +272,10 @@ int SIndexDB::Insert(const std::string &table, const std::string &key,
 	// 	tab_xi->put(*strKey, val, thread_id);
 	// }
 	// StrKey<64>* strKey = new StrKey<64>(key)
-	uint64_t tmp_key = stoull(key.substr(4));;
+	// uint64_t tmp_key = stoull(key.substr(4));
+	// uint64_t tmp_key[1] = {stoull(key.substr(4))};
 	uint64_t val = 1234;
-	tab_xi->put(*reinterpret_cast<index_key_t*>(&tmp_key), val, (uint32_t)gettid());
+	tab_xi->put(*reinterpret_cast<const index_key_t*>(&key), val, (uint32_t)gettid());
 
 	return DB::kOK;
 }
@@ -279,8 +288,9 @@ int SIndexDB::Delete(const std::string &table, const std::string &key)
 	// 	tab_xi->remove(*strKey, thread_id);
 	// }
 	// StrKey<64>* strKey = new StrKey<64>(key);
-	uint64_t tmp_key = stoull(key.substr(4));
-	tab_xi->remove(*reinterpret_cast<index_key_t*>(&tmp_key), (uint32_t)gettid());
+	// uint64_t tmp_key = stoull(key.substr(4));
+	// uint64_t tmp_key[1] = {stoull(key.substr(4))};
+	tab_xi->remove(*reinterpret_cast<const index_key_t*>(&key), (uint32_t)gettid());
 	return DB::kOK;
 }
 
@@ -298,8 +308,9 @@ void *run_fg(void *arguments) {
 	ready_threads++;
 	volatile bool res = false;
 	uint64_t dummy_value = 1234;
-	sindex_t *tab = ((ycsbc::SIndexDB*)&db_)->get_tabxi();
+	// sindex_t *tab = ((ycsbc::SIndexDB*)&db_)->get_tabxi();
 	UNUSED(res);
+
 
 	while (!running)
 		;
@@ -308,45 +319,48 @@ void *run_fg(void *arguments) {
 		switch (workload_.NextOperation()) {
 			case READ:
 			{
-				const std::string &key = workload_.NextTransactionKey();
-				uint64_t tmp_key = stoull(key.substr(4));
-				tab->get(*reinterpret_cast<index_key_t*>(&tmp_key), dummy_value, thread_id);
+				// const std::string &key = workload_.NextTransactionKey();
+				std::vector<uint64_t> key = workload_.NextTransactionKeyUint();
+				// table->get(*reinterpret_cast<index_key_t*>(key.data()), dummy_value, thread_id);
+				table->get(StrKey<64>(key), dummy_value, thread_id);
 				break;
 			}
 			case UPDATE:
 			{
-				const std::string &key = workload_.NextTransactionKey();
+				// const std::string &key = workload_.NextTransactionKey();
+				std::vector<uint64_t> key = workload_.NextTransactionKeyUint();
 				std::vector<DB::KVPair> values;
-				uint64_t tmp_key = stoull(key.substr(4));
-				tab->put(*reinterpret_cast<index_key_t*>(&tmp_key), dummy_value, thread_id);
+				// table->put(*reinterpret_cast<index_key_t*>(key.data()), dummy_value, thread_id);
+				table->put(StrKey<64>(key), dummy_value, thread_id);
 				break;
 			}
-			
 			case INSERT:
 			{
-				const std::string &key = workload_.NextSequenceKey();
-				uint64_t tmp_key = stoull(key.substr(4));
-				tab->put(*reinterpret_cast<index_key_t*>(&tmp_key), dummy_value, thread_id);
+				// const std::string &key = workload_.NextSequenceKey();
+				std::vector<uint64_t> key = workload_.NextTransactionKeyUint();
+				// table->put(*reinterpret_cast<index_key_t*>(key.data()), dummy_value, thread_id);
+				table->put(StrKey<64>(key), dummy_value, thread_id);
 				break;
 			}
-			
 			case SCAN:
 			{
-				const std::string &key = workload_.NextTransactionKey();
+				// const std::string &key = workload_.NextTransactionKey();
+				std::vector<uint64_t> key = workload_.NextTransactionKeyUint();
 				int len = workload_.NextScanLength();
 				std::vector<std::pair<index_key_t, uint64_t>> results;
-				uint64_t tmp_key = stoull(key.substr(4));
-				tab->scan(*reinterpret_cast<index_key_t*>(&tmp_key), len, results, thread_id);
+				// table->scan(*reinterpret_cast<index_key_t*>(key.data()), len, results, thread_id);
+				table->scan(StrKey<64>(key), len, results, thread_id);
 				break;
 			}
-			
 			case READMODIFYWRITE:
 			{
-				const std::string &key = workload_.NextTransactionKey();
+				// const std::string &key = workload_.NextTransactionKey();
+				std::vector<uint64_t> key = workload_.NextTransactionKeyUint();
 				std::vector<DB::KVPair> result;
-				uint64_t tmp_key = stoull(key.substr(4));
-				tab->get(*reinterpret_cast<index_key_t*>(&tmp_key), dummy_value, thread_id);
-				tab->put(*reinterpret_cast<index_key_t*>(&tmp_key), dummy_value, thread_id);
+				// table->get(*reinterpret_cast<index_key_t*>(key.data()), dummy_value, thread_id);
+				// table->put(*reinterpret_cast<index_key_t*>(key.data()), dummy_value, thread_id);
+				table->get(StrKey<64>(key), dummy_value, thread_id);
+				table->put(StrKey<64>(key), dummy_value, thread_id);
 				break;
 			}
 			

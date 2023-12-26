@@ -19,7 +19,7 @@
 using namespace std;
 using ycsbc::DB;
 using ycsbc::DBFactory;
-extern std::vector<std::string> data_to_load;
+extern std::vector<std::vector<uint64_t>> data_to_load;
 
 DB* DBFactory::CreateDB(utils::Properties &props) {
   if (props["dbname"] == "basic") {

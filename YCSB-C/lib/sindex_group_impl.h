@@ -594,6 +594,15 @@ inline size_t Group<key_t, val_t, seq, max_model_n>::exponential_search_key(
   }
 
   assert(end_i == begin_i);
+  if(!(data[end_i].first == key || end_i == 0 || end_i == (int)array_size ||
+         (data[end_i - 1].first < key && data[end_i].first > key))){
+          COUT_VAR(end_i);
+          COUT_VAR(*reinterpret_cast<uint64_t*>(&data[end_i].first));
+          COUT_VAR(*reinterpret_cast<uint64_t*>(&data[end_i - 1].first));
+          COUT_VAR(*reinterpret_cast<const uint64_t*>(&key));
+          COUT_VAR(memcmp(&data[end_i].first.buf, &key.buf, 64));
+          COUT_VAR((int)array_size);
+  }
   assert(data[end_i].first == key || end_i == 0 || end_i == (int)array_size ||
          (data[end_i - 1].first < key && data[end_i].first > key));
 

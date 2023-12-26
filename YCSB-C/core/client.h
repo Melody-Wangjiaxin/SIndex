@@ -15,7 +15,7 @@
 #include "utils.h"
 #include <mutex>
 
-std::vector<std::string> data_to_load;
+std::vector<std::vector<uint64_t>> data_to_load;
 
 
 namespace ycsbc {
@@ -52,12 +52,11 @@ inline bool Client::DoInsert() {
 }
 
 inline bool Client::DoInsert2() {
-  std::string key = workload_.NextSequenceKey();
+  // std::string key = workload_.NextSequenceKey();
   mut.lock();
+  std::vector<uint64_t> key = workload_.NextSequenceKeyUint();
   data_to_load.push_back(key);
   mut.unlock();
-  std::vector<DB::KVPair> pairs;
-  workload_.BuildValues(pairs);
   return 1;
 }
 
