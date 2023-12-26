@@ -17,7 +17,6 @@
 #include "core/core_workload.h"
 #include "db/db_factory.h"
 #include <unistd.h>
-#include <semaphore.h>
 
 using namespace std;
 
@@ -25,39 +24,19 @@ void UsageMessage(const char *command);
 bool StrStartWith(const char *str, const char *pre);
 string ParseCommandLine(int argc, const char *argv[], utils::Properties &props);
 
-uint32_t minimum_thread_id = 0x7fffffff;
-sem_t sem;
 int cnt = 0;
 int thread_num = 0;
 extern void rcu_init(size_t start_num, size_t worker_num);
 extern void run_benchmark(size_t sec, ycsbc::CoreWorkload* workload_, ycsbc::DB* db_);
+extern void run_benchmark2(ycsbc::CoreWorkload* workload_, ycsbc::DB* db_, int op_num);
 extern void *run_fg(void *arguments);
 extern size_t fg_n;
 std::string dbname;
 std::string test_type;
-utils::Timer<double> timer;
  
 
 int DelegateClient(ycsbc::DB *db, ycsbc::CoreWorkload *wl, const int num_ops,
     bool is_loading) {
-  if(dbname == "sindex" && !is_loading){
-    pid_t tid = gettid();
-    uint32_t thread_id = (uint32_t)tid;
-    // cout << "init thread " << thread_id << endl;
-    sem_wait(&sem);
-    if(thread_id < minimum_thread_id){
-      minimum_thread_id = thread_id;
-    }
-    if(cnt == 1){
-      rcu_init(minimum_thread_id, thread_num);
-    } 
-    cnt--;
-    sem_post(&sem);
-    while(cnt > 0) continue;
-    if(!timer.isStart()) timer.Start();
-    // cout << "minimum_thread_id " << minimum_thread_id << endl;
-  }
-  
   db->Init();
   ycsbc::Client client(*db, *wl);
   int oks = 0;
@@ -93,6 +72,50 @@ int main(const int argc, const char *argv[]) {
   const int num_threads = stoi(props.GetProperty("threadcount", "1"));
 
   if(test_type == "fix_op"){
+    // // Loads data
+    // vector<future<int>> actual_ops;
+    // int total_ops = stoi(props[ycsbc::CoreWorkload::RECORD_COUNT_PROPERTY]);
+    
+    // for (int i = 0; i < num_threads; ++i) {
+    //   actual_ops.emplace_back(async(launch::async,
+    //       DelegateClient, db, &wl, total_ops / num_threads, true));
+    // }
+    // assert((int)actual_ops.size() == num_threads);
+
+    // int sum = 0;
+    // for (auto &n : actual_ops) {
+    //   assert(n.valid());
+    //   sum += n.get();
+    // }
+    // cerr << "# Loading records:\t" << sum << endl;
+
+    // db = ycsbc::DBFactory::CreateDB(props);
+    // if(dbname == "sindex"){
+    //   sem_init(&sem, 0, 1);
+    //   cnt = num_threads;
+    //   minimum_thread_id = 0x7fffffff;
+    // }
+
+    // // Peforms transactions
+    // actual_ops.clear();
+    // total_ops = stoi(props[ycsbc::CoreWorkload::OPERATION_COUNT_PROPERTY]);
+    
+    // for (int i = 0; i < num_threads; ++i) {
+    //   actual_ops.emplace_back(async(launch::async,
+    //       DelegateClient, db, &wl, total_ops / num_threads, false));
+    // }
+    // assert((int)actual_ops.size() == num_threads);
+
+    // sum = 0;
+    // for (auto &n : actual_ops) {
+    //   assert(n.valid());
+    //   sum += n.get();
+    // }
+    // double duration = timer.End();
+    // cerr << "duration: " << '\t' << duration << endl;
+    // cerr << "# Transaction throughput (TPS)" << endl;
+    // cerr << props["dbname"] << '\t' << file_name << '\t' << num_threads << '\t';
+    // cerr << total_ops / duration << endl;
     // Loads data
     vector<future<int>> actual_ops;
     int total_ops = stoi(props[ycsbc::CoreWorkload::RECORD_COUNT_PROPERTY]);
@@ -111,32 +134,9 @@ int main(const int argc, const char *argv[]) {
     cerr << "# Loading records:\t" << sum << endl;
 
     db = ycsbc::DBFactory::CreateDB(props);
-    if(dbname == "sindex"){
-      sem_init(&sem, 0, 1);
-      cnt = num_threads;
-      minimum_thread_id = 0x7fffffff;
-    }
 
-    // Peforms transactions
-    actual_ops.clear();
     total_ops = stoi(props[ycsbc::CoreWorkload::OPERATION_COUNT_PROPERTY]);
-    
-    for (int i = 0; i < num_threads; ++i) {
-      actual_ops.emplace_back(async(launch::async,
-          DelegateClient, db, &wl, total_ops / num_threads, false));
-    }
-    assert((int)actual_ops.size() == num_threads);
-
-    sum = 0;
-    for (auto &n : actual_ops) {
-      assert(n.valid());
-      sum += n.get();
-    }
-    double duration = timer.End();
-    cerr << "duration: " << '\t' << duration << endl;
-    cerr << "# Transaction throughput (TPS)" << endl;
-    cerr << props["dbname"] << '\t' << file_name << '\t' << num_threads << '\t';
-    cerr << total_ops / duration << endl;
+    run_benchmark2(&wl, db, total_ops);
 
   } else if(test_type == "fix_time"){
     // Loads data
@@ -253,7 +253,7 @@ void UsageMessage(const char *command) {
   cout << "  -db dbname: specify the name of the DB to use (default: basic)" << endl;
   cout << "  -P propertyfile: load properties from the given file. Multiple files can" << endl;
   cout << "                   be specified, and will be processed in the order specified" << endl;
-  cout << "  -test-type type of test: set the standard of test, fix time and count operations, or fix operation count and calculatetime" << endl;
+  cout << "  -test-type type of test: set the standard of test, fix time and count operations, or fix operation count and calculate time" << endl;
 }
 
 inline bool StrStartWith(const char *str, const char *pre) {

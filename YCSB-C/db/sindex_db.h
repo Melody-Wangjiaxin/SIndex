@@ -130,11 +130,13 @@ size_t runtime = 10;
 size_t fg_n = 1;
 size_t bg_n = 1;
 uint64_t dummy_value = 1234;
+int op_per_thread = 0;
 
 volatile bool running = false;
 std::atomic<size_t> ready_threads(0);
 std::vector<index_key_t> exist_keys;
 std::vector<index_key_t> non_exist_keys;
+utils::Timer<double> timer;
 
 extern std::string test_type;;
 void *run_fg(void *arguments);
@@ -145,12 +147,14 @@ class args {
 		void *param;
 		ycsbc::CoreWorkload* workload_;
 		ycsbc::DB* db_;
+		int op_num;
 		
-		args(void *param, ycsbc::CoreWorkload* workload_, ycsbc::DB* db_)
+		args(void *param, ycsbc::CoreWorkload* workload_, ycsbc::DB* db_, int op_num)
 		{
 			this->param = param;
 			this->workload_ = workload_;
 			this->db_ = db_;
+			this->op_num = op_num;
 		}
 };
 
@@ -197,7 +201,7 @@ class SIndexDB : public DB {
 		exist_keys.reserve(keys.size());
 		for (size_t i = 0; i < keys.size(); ++i) {
 			// exist_keys.push_back(*reinterpret_cast<index_key_t*>(keys[i].data()));
-			exist_keys.push_back(StrKey<64>(keys[i]));
+			exist_keys.push_back(index_key_t(keys[i]));
 		}
 		COUT_VAR(exist_keys.size());
 		COUT_VAR(non_exist_keys.size());
@@ -322,7 +326,7 @@ void *run_fg(void *arguments) {
 				// const std::string &key = workload_.NextTransactionKey();
 				std::vector<uint64_t> key = workload_.NextTransactionKeyUint();
 				// table->get(*reinterpret_cast<index_key_t*>(key.data()), dummy_value, thread_id);
-				table->get(StrKey<64>(key), dummy_value, thread_id);
+				table->get(index_key_t(key), dummy_value, thread_id);
 				break;
 			}
 			case UPDATE:
@@ -331,7 +335,7 @@ void *run_fg(void *arguments) {
 				std::vector<uint64_t> key = workload_.NextTransactionKeyUint();
 				std::vector<DB::KVPair> values;
 				// table->put(*reinterpret_cast<index_key_t*>(key.data()), dummy_value, thread_id);
-				table->put(StrKey<64>(key), dummy_value, thread_id);
+				table->put(index_key_t(key), dummy_value, thread_id);
 				break;
 			}
 			case INSERT:
@@ -339,7 +343,7 @@ void *run_fg(void *arguments) {
 				// const std::string &key = workload_.NextSequenceKey();
 				std::vector<uint64_t> key = workload_.NextTransactionKeyUint();
 				// table->put(*reinterpret_cast<index_key_t*>(key.data()), dummy_value, thread_id);
-				table->put(StrKey<64>(key), dummy_value, thread_id);
+				table->put(index_key_t(key), dummy_value, thread_id);
 				break;
 			}
 			case SCAN:
@@ -349,7 +353,7 @@ void *run_fg(void *arguments) {
 				int len = workload_.NextScanLength();
 				std::vector<std::pair<index_key_t, uint64_t>> results;
 				// table->scan(*reinterpret_cast<index_key_t*>(key.data()), len, results, thread_id);
-				table->scan(StrKey<64>(key), len, results, thread_id);
+				table->scan(index_key_t(key), len, results, thread_id);
 				break;
 			}
 			case READMODIFYWRITE:
@@ -359,8 +363,8 @@ void *run_fg(void *arguments) {
 				std::vector<DB::KVPair> result;
 				// table->get(*reinterpret_cast<index_key_t*>(key.data()), dummy_value, thread_id);
 				// table->put(*reinterpret_cast<index_key_t*>(key.data()), dummy_value, thread_id);
-				table->get(StrKey<64>(key), dummy_value, thread_id);
-				table->put(StrKey<64>(key), dummy_value, thread_id);
+				table->get(index_key_t(key), dummy_value, thread_id);
+				table->put(index_key_t(key), dummy_value, thread_id);
 				break;
 			}
 			
@@ -370,6 +374,67 @@ void *run_fg(void *arguments) {
 		thread_param.throughput++;
 	}
 
+	pthread_exit(nullptr);
+}
+
+void *run_fg2(void *arguments) {
+	void *param = ((args*)arguments)->param;
+	ycsbc::CoreWorkload &workload_ = *(((args*)arguments)->workload_);
+	ycsbc::DB &db_ = *(((args*)arguments)->db_);
+	int op_num = ((args*)arguments)->op_num;
+
+	fg_param_t &thread_param = *(fg_param_t *)param;
+	uint32_t thread_id = thread_param.thread_id;
+	sindex_t *table = thread_param.table;
+
+	COUT_THIS("[micro] Worker" << thread_id << " Ready.");
+	ready_threads++;
+	volatile bool res = false;
+	uint64_t dummy_value = 1234;
+	UNUSED(res);
+	
+	for(size_t i = 0; i < op_num; i++){
+		switch (workload_.NextOperation()) {
+			case READ:
+			{
+				std::vector<uint64_t> key = workload_.NextTransactionKeyUint();
+				table->get(index_key_t(key), dummy_value, thread_id);
+				break;
+			}
+			case UPDATE:
+			{
+				std::vector<uint64_t> key = workload_.NextTransactionKeyUint();
+				std::vector<DB::KVPair> values;
+				table->put(index_key_t(key), dummy_value, thread_id);
+				break;
+			}
+			case INSERT:
+			{
+				std::vector<uint64_t> key = workload_.NextTransactionKeyUint();
+				table->put(index_key_t(key), dummy_value, thread_id);
+				break;
+			}
+			case SCAN:
+			{
+				std::vector<uint64_t> key = workload_.NextTransactionKeyUint();
+				int len = workload_.NextScanLength();
+				std::vector<std::pair<index_key_t, uint64_t>> results;
+				table->scan(index_key_t(key), len, results, thread_id);
+				break;
+			}
+			case READMODIFYWRITE:
+			{
+				std::vector<uint64_t> key = workload_.NextTransactionKeyUint();
+				std::vector<DB::KVPair> result;
+				table->get(index_key_t(key), dummy_value, thread_id);
+				table->put(index_key_t(key), dummy_value, thread_id);
+				break;
+			}
+			
+			default:
+				throw utils::Exception("Operation request is not recognized!");
+		}
+	}
 	pthread_exit(nullptr);
 }
 
@@ -389,9 +454,9 @@ void run_benchmark(size_t sec, ycsbc::CoreWorkload* workload_, ycsbc::DB* db_) {
 		fg_params[worker_i].thread_id = worker_i;
 		fg_params[worker_i].throughput = 0;
 
-		args* a = new args((void *)&fg_params[worker_i], workload_, db_);
+		args* a = new args((void *)&fg_params[worker_i], workload_, db_, 0); // 操作数没有用
 
-		int ret = pthread_create(&threads[worker_i], nullptr, run_fg, (void*)a);
+		int ret = pthread_create(&threads[worker_i], nullptr, run_fg2, (void*)a);
 		if (ret) {
 			COUT_N_EXIT("Error:" << ret);
 		}
@@ -428,6 +493,49 @@ void run_benchmark(size_t sec, ycsbc::CoreWorkload* workload_, ycsbc::DB* db_) {
 		throughput += p.throughput;
 	}
 	COUT_THIS("[micro] Throughput(op/s): " << throughput / sec);
+}
+
+void run_benchmark2(ycsbc::CoreWorkload* workload_, ycsbc::DB* db_, int op_num) {
+	pthread_t threads[fg_n];
+	fg_param_t fg_params[fg_n];
+	// check if parameters are cacheline aligned
+	for (size_t i = 0; i < fg_n; i++) {
+		if ((uint64_t)(&(fg_params[i])) % CACHELINE_SIZE != 0) {
+			COUT_N_EXIT("wrong parameter address: " << &(fg_params[i]));
+		}
+	}
+
+	running = false;
+	op_per_thread = op_num / fg_n;
+	for (size_t worker_i = 0; worker_i < fg_n; worker_i++) {
+		fg_params[worker_i].table = ((ycsbc::SIndexDB*)db_)->get_tabxi();
+		fg_params[worker_i].thread_id = worker_i;
+		fg_params[worker_i].throughput = 0;
+
+		args* a = new args((void *)&fg_params[worker_i], workload_, db_, op_per_thread);
+
+		int ret = pthread_create(&threads[worker_i], nullptr, run_fg2, (void*)a);
+		if (ret) {
+			COUT_N_EXIT("Error:" << ret);
+		}
+	}
+
+	COUT_THIS("[micro] prepare data ...");
+	while (ready_threads < fg_n) sleep(1);
+
+	timer.Start();
+	void *status;
+	for (size_t i = 0; i < fg_n; i++) {
+		int rc = pthread_join(threads[i], &status);
+		if (rc) {
+			COUT_N_EXIT("Error:unable to join," << rc);
+		}
+	}
+	double duration = timer.End();
+	COUT_VAR(op_num);
+	COUT_VAR(duration);
+
+	COUT_THIS("[micro] Throughput(op/s): " << 1.0 * op_num / duration);
 }
 
 #endif // YCSB_C_SINDEX_DB_H_
