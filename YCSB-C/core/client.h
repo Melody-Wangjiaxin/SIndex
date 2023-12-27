@@ -14,7 +14,6 @@
 #include "core_workload.h"
 #include "utils.h"
 #include <mutex>
-
 std::vector<std::vector<uint64_t>> data_to_load;
 
 

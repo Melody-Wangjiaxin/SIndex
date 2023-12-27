@@ -17,6 +17,7 @@
 #include "core/core_workload.h"
 #include "db/db_factory.h"
 #include <unistd.h>
+#include <atomic>
 
 using namespace std;
 
@@ -31,6 +32,8 @@ extern void run_benchmark(size_t sec, ycsbc::CoreWorkload* workload_, ycsbc::DB*
 extern void run_benchmark2(ycsbc::CoreWorkload* workload_, ycsbc::DB* db_, int op_num);
 extern void *run_fg(void *arguments);
 extern size_t fg_n;
+extern std::atomic<size_t> ready_threads;
+extern std::atomic<size_t> ready_bgs;
 std::string dbname;
 std::string test_type;
  
@@ -131,11 +134,11 @@ int main(const int argc, const char *argv[]) {
       assert(n.valid());
       sum += n.get();
     }
-    cerr << "# Loading records:\t" << sum << endl;
+    cout << "# Loading records:\t" << sum << endl;
 
-    db = ycsbc::DBFactory::CreateDB(props);
-
+    actual_ops.clear();
     total_ops = stoi(props[ycsbc::CoreWorkload::OPERATION_COUNT_PROPERTY]);
+    db = ycsbc::DBFactory::CreateDB(props);
     run_benchmark2(&wl, db, total_ops);
 
   } else if(test_type == "fix_time"){
@@ -161,6 +164,8 @@ int main(const int argc, const char *argv[]) {
   } else{
     cout << "Unknown test type" << endl;
   }
+  while(ready_bgs != 0) continue;
+  if(db != nullptr) delete db; 
 }
 
 string ParseCommandLine(int argc, const char *argv[], utils::Properties &props) {

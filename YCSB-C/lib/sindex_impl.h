@@ -23,10 +23,11 @@
 #include "lib/sindex_group_impl.h"
 #include "lib/sindex_model.h"
 #include "lib/sindex_root_impl.h"
+#include <atomic>
 
 #if !defined(SINDEX_IMPL_H)
 #define SINDEX_IMPL_H
-
+std::atomic<size_t> ready_bgs(0);
 
 namespace sindex {
 
@@ -119,11 +120,13 @@ void *SIndex<key_t, val_t, seq>::background(void *this_) {
     info[bg_i].finished = false;
     info[bg_i].running = true;
     info[bg_i].should_update_array = false;
+    // COUT_THIS("create root_t::do_adjustment");
     int ret = pthread_create(&threads[bg_i], nullptr, root_t::do_adjustment,
                              &info[bg_i]);
     if (ret) {
       COUT_N_EXIT("Error: unable to create bg task thread, " << ret);
     }
+    ready_bgs++;
   }
 
   while (index.bg_running) {
@@ -197,6 +200,7 @@ void *SIndex<key_t, val_t, seq>::background(void *this_) {
     if (rc) {
       COUT_N_EXIT("Error: unable to join," << rc);
     }
+    ready_bgs--;
   }
 
   return nullptr;
@@ -205,6 +209,7 @@ void *SIndex<key_t, val_t, seq>::background(void *this_) {
 template <class key_t, class val_t, bool seq>
 void SIndex<key_t, val_t, seq>::start_bg() {
   bg_running = true;
+  // COUT_THIS("create background");
   int ret = pthread_create(&bg_master, nullptr, background, this);
   if (ret) {
     COUT_N_EXIT("Error: unable to create background thread," << ret);
@@ -213,6 +218,7 @@ void SIndex<key_t, val_t, seq>::start_bg() {
 
 template <class key_t, class val_t, bool seq>
 void SIndex<key_t, val_t, seq>::terminate_bg() {
+  // COUT_THIS("terminate bg");
   config.exited = true;
   bg_running = false;
 }

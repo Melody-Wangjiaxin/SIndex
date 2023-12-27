@@ -52,10 +52,11 @@ class SIndex {
   size_t range_scan(const key_t &begin, const key_t &end,
                     std::vector<std::pair<key_t, val_t>> &result,
                     const uint32_t worker_id);
- private:
   void start_bg();
   void terminate_bg();
 
+ private:
+  
   // this function should periodically check and perform structure updates
   static void *background(void *this_);
 

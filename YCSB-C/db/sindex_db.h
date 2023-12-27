@@ -171,7 +171,8 @@ class SIndexDB : public DB {
 	}
 
 	~SIndexDB(){
-		if(tab_xi) delete tab_xi;
+		// COUT_THIS("~SIndexDB()");
+		if(tab_xi != nullptr) delete tab_xi;
 	}
 
   int Read(const std::string &table, const std::string &key,
@@ -393,6 +394,7 @@ void *run_fg2(void *arguments) {
 	uint64_t dummy_value = 1234;
 	UNUSED(res);
 	
+	
 	for(size_t i = 0; i < op_num; i++){
 		switch (workload_.NextOperation()) {
 			case READ:
@@ -434,6 +436,7 @@ void *run_fg2(void *arguments) {
 			default:
 				throw utils::Exception("Operation request is not recognized!");
 		}
+		thread_param.throughput++;
 	}
 	pthread_exit(nullptr);
 }
@@ -456,7 +459,7 @@ void run_benchmark(size_t sec, ycsbc::CoreWorkload* workload_, ycsbc::DB* db_) {
 
 		args* a = new args((void *)&fg_params[worker_i], workload_, db_, 0); // 操作数没有用
 
-		int ret = pthread_create(&threads[worker_i], nullptr, run_fg2, (void*)a);
+		int ret = pthread_create(&threads[worker_i], nullptr, run_fg, (void*)a);
 		if (ret) {
 			COUT_N_EXIT("Error:" << ret);
 		}
@@ -513,7 +516,7 @@ void run_benchmark2(ycsbc::CoreWorkload* workload_, ycsbc::DB* db_, int op_num) 
 		fg_params[worker_i].throughput = 0;
 
 		args* a = new args((void *)&fg_params[worker_i], workload_, db_, op_per_thread);
-
+		// COUT_THIS("create run_fg2");
 		int ret = pthread_create(&threads[worker_i], nullptr, run_fg2, (void*)a);
 		if (ret) {
 			COUT_N_EXIT("Error:" << ret);
@@ -530,12 +533,23 @@ void run_benchmark2(ycsbc::CoreWorkload* workload_, ycsbc::DB* db_, int op_num) 
 		if (rc) {
 			COUT_N_EXIT("Error:unable to join," << rc);
 		}
+		ready_threads--;
 	}
 	double duration = timer.End();
+
+	size_t throughput = 0;
+	for (auto &p : fg_params) {
+		throughput += p.throughput;
+	}
+
 	COUT_VAR(op_num);
 	COUT_VAR(duration);
+	COUT_VAR(throughput);
 
 	COUT_THIS("[micro] Throughput(op/s): " << 1.0 * op_num / duration);
+	while(ready_threads != 0) continue;
+  // while(ready_bgs != 0) continue;
+	((ycsbc::SIndexDB*)db_)->get_tabxi()->terminate_bg();
 }
 
 #endif // YCSB_C_SINDEX_DB_H_
