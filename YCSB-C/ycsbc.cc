@@ -140,7 +140,8 @@ int main(const int argc, const char *argv[]) {
     total_ops = stoi(props[ycsbc::CoreWorkload::OPERATION_COUNT_PROPERTY]);
     db = ycsbc::DBFactory::CreateDB(props);
     run_benchmark2(&wl, db, total_ops);
-
+    while(ready_bgs != 0) continue;
+    if(db != nullptr) delete db; 
   } else if(test_type == "fix_time"){
     // Loads data
     vector<future<int>> actual_ops;
@@ -164,8 +165,7 @@ int main(const int argc, const char *argv[]) {
   } else{
     cout << "Unknown test type" << endl;
   }
-  while(ready_bgs != 0) continue;
-  if(db != nullptr) delete db; 
+  
 }
 
 string ParseCommandLine(int argc, const char *argv[], utils::Properties &props) {
